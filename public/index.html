@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Joguin</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+  <canvas id="game-screen" style="
+  width: 500px;
+  height: 500px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  image-rendering: -moz-crisp-edges;
+  border: 10px solid rgb(88, 84, 84);
+  " width="10px" height="10px">
+  </canvas>
+
+
+  <script type="module">
+    import { createGame } from './game.js';
+    import { createKeyboardListener } from './keyboard-listner.js'
+    import { renderScreen } from './renderScreen.js'
+
+    const socket = io();
+    const game = createGame()
+    const score = document.querySelector('.players')
+    
+    const keyboard = createKeyboardListener();
+    
+    socket.on('connect', () => {
+      const playerId = socket.id;
+      console.log(`Player connected on client with id: ${playerId}`);
+      
+      renderScreen(game.state, requestAnimationFrame, playerId)
+    })
+
+    socket.on('setup', (state) => {
+      const playerId = socket.id
+      game.setState(state)
+      
+      keyboard.registerPlayerId(socket.id)
+      keyboard.subscribe(game.movePlayer)
+      keyboard.subscribe((command) => {
+        socket.emit('move-player', command)
+      })
+
+      let html = ''
+     
+      for (const id in game.state.players) {
+        const player = game.state.players[id]
+        html += `player: ${id}, score: ${player.score} <br/>`
+      }
+      score.innerHTML = html
+    })
+
+    socket.on('add-player', (command) => {
+      game.addPlayer(command)
+      score.innerHTML = JSON.stringify(game.state.players)
+    })
+
+    socket.on('remove-player', (command) => {
+      game.removePlayer(command)
+    })
+
+    socket.on('add-fruit', (command) => {
+      game.addFruit(command)
+    })
+
+    socket.on('remove-fruit', (command) => {
+      game.removeFruit(command)
+    })
+
+    socket.on('move-player', (command) => {
+      const playerId = socket.id
+
+      if (playerId !== command.playerId) {
+        game.movePlayer(command)
+      }
+    })
+
+    socket.on('new-score', (command) => {
+      console.log(command)
+      let html = ''
+     
+      for (const id in command.score) {
+        const player = command.score[id]
+        html += `player: ${id}, score: ${player.score} <br/>`
+      }
+      score.innerHTML = html
+    })
+
+  </script>
+  <div class="score-players">
+    <div class="players">
+    </div>
+  </div>
+</body>
+
+</html>
